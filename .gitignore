@@ -1,0 +1,20 @@
+# Python virtual environment
+.venv/
+venv/
+ENV/
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Local SQLite databases (keep data local, do not commit runtime DB)
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment and IDE configs
+.env
+.vscode/
+.idea/
