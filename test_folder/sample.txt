@@ -1,0 +1,2 @@
+Hello from the dedicated MCP filesystem test folder!
+This file is used to safely demonstrate and verify restricted filesystem MCP server access.

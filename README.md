@@ -1,139 +1,214 @@
-# Book Library MCP Server (mcp-intern-sasikala)
+# MCP Intern Project — Book Library & Existing MCP Servers
 
-A production-grade, beginner-friendly **Model Context Protocol (MCP)** server built in Python using SQLite. This server exposes a local book library to MCP-compatible AI hosts, providing real-time book searching, catalog management, and borrowing operations through structured tools, resources, and reusable prompts.
+A complete, production-grade **Model Context Protocol (MCP)** implementation built in Python using SQLite for the internship assignment: *"MCP Intern Project: Build Your First MCP Server"*.
+
+This repository contains:
+1. **The Book Library MCP Server** (`server.py`): The core custom project with real-time SQLite storage, duplicate prevention, and grounded prompts.
+2. **Existing MCP Server Integrations (Day 1 Requirements)**:
+   - **Filesystem MCP Server** restricted to a dedicated `test_folder/`.
+   - **GitHub MCP Server** configured securely with least-privilege token access.
+3. **Automated Verification & Test Suite**: 6 automated pytest tests and an end-to-end stdio protocol exchange runner.
 
 ---
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [MCP Architecture (Host, Client, Server)](#mcp-architecture-host-client-server)
-3. [Features & Capabilities](#features--capabilities)
-   - [MCP Tools](#mcp-tools)
-   - [MCP Resource](#mcp-resource)
-   - [MCP Prompt](#mcp-prompt)
-4. [Technology Stack](#technology-stack)
-5. [Prerequisites](#prerequisites)
-6. [Windows Installation & Setup](#windows-installation--setup)
-7. [Running the MCP Server](#running-the-mcp-server)
+1. [Host, Client, and Server in Simple Words](#host-client-and-server-in-simple-words)
+2. [Architecture Diagram](#architecture-diagram)
+3. [Day 1 Audit: Connecting Existing MCP Servers](#day-1-audit-connecting-existing-mcp-servers)
+   - [Restricted Filesystem Server](#1-restricted-filesystem-server)
+   - [GitHub MCP Server & Security](#2-github-mcp-server--security)
+4. [Days 2–4 Audit: Book Library MCP Server](#days-24-audit-book-library-mcp-server)
+   - [Tools (`search_books`, `add_book`, `borrow_book`)](#mcp-tools)
+   - [Resource (`library://catalog`)](#mcp-resource)
+   - [Prompt (`recommend-a-book`)](#mcp-prompt)
+5. [Day 5 Audit: Automated Tests & Security](#day-5-audit-automated-tests--security)
+6. [Antigravity & AI Host Integration Evidence](#antigravity--ai-host-integration-evidence)
+7. [Installation & Windows PowerShell Setup](#installation--windows-powershell-setup)
 8. [Testing with MCP Inspector](#testing-with-mcp-inspector)
-9. [Connecting to AI Applications](#connecting-to-ai-applications)
-   - [Option A: Google Antigravity](#option-a-google-antigravity)
-   - [Option B: Claude Desktop](#option-b-claude-desktop)
-   - [Option C: VS Code (Roo Code / Cline / Copilot)](#option-c-vs-code-roo-code--cline--copilot)
-10. [Example Questions for the AI](#example-questions-for-the-ai)
-11. [Running Automated Tests](#running-automated-tests)
-12. [Project Structure](#project-structure)
-13. [Security & Input Validation](#security--input-validation)
-14. [Project Limitations](#project-limitations)
-15. [Git & GitHub Setup](#git--github-setup)
-16. [Five-Minute Internship Demo Script](#five-minute-internship-demo-script)
+9. [Running Real Protocol Exchanges](#running-real-protocol-exchanges)
+10. [GitHub Submission Guide (`mcp-intern-sasikala`)](#github-submission-guide)
+11. [Five-Minute Internship Presentation Script](#five-minute-internship-presentation-script)
 
 ---
 
-## Overview
+## Host, Client, and Server in Simple Words
 
-The **Book Library MCP Server** bridges the gap between Large Language Models (LLMs) and local database storage. Instead of hallucinating titles or relying on static training data, the AI can:
-- Query real-time library inventory in an SQLite database.
-- Insert newly acquired books with duplicate prevention.
-- Check out / borrow books with instant state transitions.
-- Read complete catalogue snapshots via protocol resources.
-- Use grounded recommendation prompts that recommend only real, available books.
+To explain the Model Context Protocol in three simple sentences:
+
+1. **The Host**: The user-facing AI application (such as Google Antigravity or Claude Desktop) that manages the chat window, user interaction, and Large Language Model reasoning.
+2. **The Client**: The internal connector inside the Host that negotiates capabilities, formats JSON-RPC requests, and routes tool calls to external servers.
+3. **The Server**: The specialized program (like our Python MCP servers) that securely exposes tools, resources, and prompts from local databases or external APIs.
 
 ---
 
-## MCP Architecture (Host, Client, Server)
-
-The Model Context Protocol separates responsibilities across three key layers:
+## Architecture Diagram
 
 ```mermaid
-flowchart LR
-    subgraph Host["Host Application (e.g. Antigravity / Claude Desktop)"]
-        UI["Chat Interface & LLM Orchestrator"]
-        Client["MCP Client"]
+flowchart TD
+    subgraph Host["MCP Host Application (Google Antigravity / Claude Desktop)"]
+        Chat["Chat UI & LLM Orchestrator"]
+        Client["Internal MCP Client (JSON-RPC)"]
     end
 
-    subgraph Server["MCP Server (Python + SQLite)"]
-        Tools["Tools: search_books, add_book, borrow_book"]
-        Resource["Resource: library://catalog"]
-        Prompt["Prompt: recommend-a-book"]
-        DB[(SQLite: library.db)]
+    subgraph Server1["Book Library Server (server.py)"]
+        LTools["Tools: search_books, add_book, borrow_book"]
+        LRes["Resource: library://catalog"]
+        LPrompt["Prompt: recommend-a-book"]
+        LDB[(SQLite: library.db)]
     end
 
-    UI --> Client
-    Client <-->|"JSON-RPC (stdio transport)"| Server
-    Tools --> DB
-    Resource --> DB
-    Prompt --> DB
+    subgraph Server2["Filesystem Server (servers/filesystem_server.py)"]
+        FTools["Tools: list_directory, read_file, write_file, get_file_info"]
+        Folder["Dedicated test_folder/ (Path traversal protected)"]
+    end
+
+    subgraph Server3["GitHub Server (servers/github_server.py)"]
+        GTools["Tools: get_repository, search_repositories, list_issues"]
+        API["GitHub REST API (Token secured via env var)"]
+    end
+
+    Chat --> Client
+    Client <-->|"stdio (JSON-RPC)"| Server1
+    Client <-->|"stdio (JSON-RPC)"| Server2
+    Client <-->|"stdio (JSON-RPC)"| Server3
+
+    LTools --> LDB
+    LRes --> LDB
+    LPrompt --> LDB
+    FTools --> Folder
+    GTools --> API
 ```
-
-### Explaining Host, Client, and Server in Simple Words:
-1. **The Host**: The user-facing AI application (like Antigravity or Claude Desktop) that manages the chat window and talks to the Large Language Model.
-2. **The Client**: The internal connector inside the Host that negotiates capabilities, handles the protocol format, and routes requests to external servers.
-3. **The Server**: Our lightweight Python program (`server.py`) that securely accesses local data (SQLite) and provides tools, resources, and prompts back to the Client.
 
 ---
 
-## Features & Capabilities
+## Day 1 Audit: Connecting Existing MCP Servers
+
+The mentor assignment requires connecting two existing servers:
+
+### 1. Restricted Filesystem Server
+- **Implementation**: Provided via `servers/filesystem_server.py` (and compatible with `@modelcontextprotocol/server-filesystem`).
+- **Dedicated Test Folder**: Scoped strictly to `C:\Users\acer\OneDrive\Documents\fastapi\mcp-server\test_folder`.
+- **Security Check**: Employs canonical path resolution (`Path.resolve()`). Any attempt to access files outside `test_folder` (e.g. `../../server.py`) is immediately blocked with `Access denied: Path resolves outside allowed test folder`.
+
+### 2. GitHub MCP Server & Security
+- **Implementation**: Provided via `servers/github_server.py` (and compatible with `@modelcontextprotocol/server-github`).
+- **Authentication**: Reads the personal access token securely from the environment variable `$env:GITHUB_PERSONAL_ACCESS_TOKEN`.
+- **Token Security Rules**:
+  - Never hardcode the token in code, configuration files, chat, or Git.
+  - Never display token characters in logs or terminal outputs.
+- **Minimum Required GitHub Permissions**:
+  - Prefer a **Fine-Grained Personal Access Token (PAT)** over classic tokens.
+  - **Repository Scope**: Only select the target repository (e.g., `mcp-intern-sasikala`), NOT "All repositories".
+  - **Permissions**:
+    - `Contents`: Read & Write (for reading files and pushing code).
+    - `Issues`: Read & Write (for managing project issues).
+    - `Metadata`: Read-only (mandatory GitHub default).
+
+---
+
+## Days 2–4 Audit: Book Library MCP Server
 
 ### MCP Tools
 
-| Tool Name | Description | Parameters | Validation / Safety |
+| Tool | Parameters | Description | Validation & Safety |
 | :--- | :--- | :--- | :--- |
-| `search_books` | Searches books by title or author keywords. Returns matching IDs, titles, authors, and availability. | `query` (string) | Trims whitespace, handles empty or blank inputs gracefully, returns helpful suggestions when no matches are found. |
-| `add_book` | Adds a new book to the SQLite database. | `title` (string), `author` (string) | Rejects blank or empty values, trims inputs, checks case-insensitive duplicates to avoid accidental duplicates. |
-| `borrow_book` | Borrows an available book by its ID. | `book_id` (integer) | Enforces positive integer IDs, verifies existence in database, prevents borrowing already checked-out books. |
+| `search_books` | `query: str` | Searches catalogue by title or author keywords. | Trims whitespace, handles empty strings gracefully, returns suggestions if not found. |
+| `add_book` | `title: str, author: str` | Inserts a new book into SQLite. | Rejects blank values, checks case-insensitive duplicates to prevent accidental duplicates. |
+| `borrow_book` | `book_id: int` | Marks a book as checked out. | Validates positive integers, verifies book existence, returns helpful error if already borrowed. |
 
 ### MCP Resource
-
 - **URI**: `library://catalog`
-- **Description**: Returns the full library book catalogue formatted with book IDs, availability status, titles, and authors directly from the SQLite database.
-- **Purpose**: Gives the AI host a full context document without needing repeated tool calls.
+- **Output**: Returns the full inventory formatted with ID, status, title, and author.
 
 ### MCP Prompt
-
 - **Name**: `recommend-a-book`
-- **Argument**: `topic_or_genre` (optional, default: `"general reading"`)
-- **Description**: Generates a grounded recommendation prompt containing the live library catalog.
-- **Safety**: Strictly instructs the AI to recommend only books that exist in the local database and to prioritize available titles over currently borrowed ones.
+- **Argument**: `topic_or_genre: str`
+- **Grounding Rule**: Dynamically pulls available books from the SQLite database and instructs the AI never to recommend books outside the catalogue.
 
 ---
 
-## Technology Stack
+## Day 5 Audit: Automated Tests & Security
 
-- **Language**: Python 3.10+ (standard, free, open-source)
-- **Protocol SDK**: Official `mcp[cli]` (Model Context Protocol Python SDK)
-- **Database**: SQLite3 (built into Python standard library, zero external server dependencies)
-- **Testing**: `pytest` for automated test suites
-- **Transport**: Standard I/O (`stdio`), the standard low-overhead transport for local desktop MCP integrations
-
----
-
-## Prerequisites
-
-1. **Windows 10 / 11** with PowerShell.
-2. **Python 3.10 or later** installed (verify with `py --version` or `python --version`).
-3. **Node.js / npx** (Optional: only needed if running the standalone MCP Inspector web UI via `npx @modelcontextprotocol/inspector`).
-4. **Git** for version control.
-
----
-
-## Windows Installation & Setup
-
-Open **Windows PowerShell** and navigate to your project directory:
+Run the automated test suite using the virtual environment:
 
 ```powershell
-# 1. Navigate to the project root folder
+.\.venv\Scripts\python.exe -m pytest -v
+```
+
+### Verified Test Results:
+```text
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.7.0
+rootdir: C:\Users\acer\OneDrive\Documents\fastapi\mcp-server
+
+tests/test_server.py::test_search_books PASSED                           [ 16%]
+tests/test_server.py::test_add_valid_book PASSED                         [ 33%]
+tests/test_server.py::test_add_invalid_input_and_duplicates PASSED       [ 50%]
+tests/test_server.py::test_borrow_available_book PASSED                  [ 66%]
+tests/test_server.py::test_borrow_unknown_or_already_borrowed PASSED     [ 83%]
+tests/test_server.py::test_resource_and_prompt PASSED                    [100%]
+
+============================== 6 passed in 2.47s ==============================
+```
+
+- **Isolation Guarantee**: Uses `pytest` `tmp_path` fixtures to ensure each test runs against a fresh, temporary SQLite database. The production `library.db` is never modified during test runs.
+
+---
+
+## Antigravity & AI Host Integration Evidence
+
+Antigravity automatically discovers and configures local stdio MCP servers via `%USERPROFILE%\.gemini\config\mcp_config.json`.
+
+### Host Configuration File (`~/.gemini/config/mcp_config.json`):
+```json
+{
+  "mcpServers": {
+    "book-library": {
+      "command": "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\.venv\\Scripts\\python.exe",
+      "args": [
+        "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\server.py"
+      ]
+    },
+    "filesystem": {
+      "command": "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\.venv\\Scripts\\python.exe",
+      "args": [
+        "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\servers\\filesystem_server.py"
+      ],
+      "env": {
+        "MCP_FILESYSTEM_ROOT": "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\test_folder"
+      }
+    },
+    "github": {
+      "command": "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\.venv\\Scripts\\python.exe",
+      "args": [
+        "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\servers\\github_server.py"
+      ]
+    }
+  }
+}
+```
+
+### Direct Verification Evidence:
+Upon reading `mcp_config.json`, Antigravity spawned the `book-library` server, queried `tools/list`, and persisted the discovered tool schemas into:
+`C:\Users\acer\.gemini\antigravity\mcp\book-library\`
+- `search_books.json`
+- `add_book.json`
+- `borrow_book.json`
+
+---
+
+## Installation & Windows PowerShell Setup
+
+```powershell
+# 1. Navigate to project root
 cd c:\Users\acer\OneDrive\Documents\fastapi\mcp-server
 
-# 2. Create a virtual environment using Python 3.10
+# 2. Virtual environment setup (Python 3.10)
 py -3.10 -m venv .venv
 
-# 3. Activate the virtual environment
+# 3. Activate environment
 .venv\Scripts\Activate.ps1
-
-# (If PowerShell blocks script activation, run:
-#  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process)
 
 # 4. Install dependencies
 pip install -r requirements.txt
@@ -141,240 +216,96 @@ pip install -r requirements.txt
 
 ---
 
-## Running the MCP Server
-
-The server communicates via standard input/output (`stdio`), which is designed to be spawned by an MCP host or client:
-
-```powershell
-# Start the server directly in stdio mode:
-.venv\Scripts\python.exe server.py
-```
-
-When started, it automatically creates `library.db` if it does not exist and seeds 5 initial sample books.
-
----
-
 ## Testing with MCP Inspector
 
-The official MCP Inspector allows you to inspect tools, call functions, read resources, and test prompts interactively in a browser.
-
-### Option 1: Using the Official MCP CLI (Recommended)
-
-The installed `mcp` CLI includes built-in inspector support:
+Test the server using the official MCP CLI:
 
 ```powershell
 .venv\Scripts\mcp.exe dev server.py
 ```
 
-This launches the local MCP Inspector server and opens your browser.
-
-### Option 2: Using `npx` with Stdio Transport
-
-If you have Node.js installed, launch the Inspector directly:
-
+Or using `npx` (if Node.js is installed):
 ```powershell
 npx @modelcontextprotocol/inspector .venv\Scripts\python.exe server.py
 ```
 
-### Steps inside the MCP Inspector UI:
-1. **Verify Connection**: Ensure the transport shows `stdio` and the server status is connected.
-2. **Inspect Tools (`tools/list`)**:
-   - Click on the **Tools** tab.
-   - Verify that `search_books`, `add_book`, and `borrow_book` are listed with full schema descriptions.
-3. **Call `search_books`**:
-   - Pass `{"query": "Hobbit"}` and click **Run Tool**.
-   - Result: Returns `The Hobbit` by J.R.R. Tolkien with status `Available`.
-4. **Call `add_book`**:
-   - Pass `{"title": "The Rust Programming Language", "author": "Steve Klabnik"}`.
-   - Result: Returns confirmation with a new book ID (e.g., ID 6).
-5. **Call `borrow_book`**:
-   - Pass `{"book_id": 1}`.
-   - Result: Marks book ID 1 as borrowed.
-   - Re-running with `{"book_id": 1}` returns the error message: `Already borrowed and not currently available`.
-6. **Inspect Resource (`resources/list`)**:
-   - Click on the **Resources** tab and select `library://catalog`.
-   - Click **Read Resource** to view the formatted catalog text.
-7. **Inspect Prompt (`prompts/list`)**:
-   - Click on the **Prompts** tab and select `recommend-a-book`.
-   - Provide an interest such as `"coding"` and inspect the generated grounded prompt.
-
 ---
 
-## Connecting to AI Applications
+## Running Real Protocol Exchanges
 
-### Option A: Google Antigravity
-
-Antigravity natively supports local stdio MCP servers via its configuration file.
-
-1. Open or create the global MCP configuration file:
-   `%USERPROFILE%\.gemini\config\mcp_config.json`
-2. Add the `book-library` server entry:
-
-```json
-{
-  "mcpServers": {
-    "book-library": {
-      "command": "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\.venv\\Scripts\\python.exe",
-      "args": [
-        "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\server.py"
-      ]
-    }
-  }
-}
-```
-
-3. Restart Antigravity or reopen the workspace.
-4. Navigate to **Additional Options (...) > MCP Servers** to verify the server is active and the 3 tools are loaded.
-
----
-
-### Option B: Claude Desktop
-
-If using the Claude Desktop application:
-
-1. Open `%APPDATA%\Claude\claude_desktop_config.json`.
-2. Add the server under `mcpServers`:
-
-```json
-{
-  "mcpServers": {
-    "book-library": {
-      "command": "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\.venv\\Scripts\\python.exe",
-      "args": [
-        "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\server.py"
-      ]
-    }
-  }
-}
-```
-
-3. Restart Claude Desktop. A hammer icon will appear in the chat prompt indicating tools are available.
-
----
-
-### Option C: VS Code (Roo Code / Cline / Copilot)
-
-In VS Code with the Cline or Roo Code extension:
-1. Open the MCP Servers settings panel.
-2. Add:
-   - **Command**: `c:\Users\acer\OneDrive\Documents\fastapi\mcp-server\.venv\Scripts\python.exe`
-   - **Args**: `["c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\server.py"]`
-
----
-
-## Example Questions for the AI
-
-Once connected, ask the AI these three questions to observe autonomous tool selection:
-
-### Question 1 (Triggers `search_books`)
-> *"Do we have any books written by George Orwell or anything about dystopian fiction?"*
-- **Expected Action**: The AI calls `search_books(query="Orwell")`.
-- **Expected Response**: The AI identifies book ID 2 (`1984` by George Orwell) and tells you it is currently available.
-
-### Question 2 (Triggers `add_book`)
-> *"I just bought 'Fluent Python' by Luciano Ramalho for the library. Please register it in our catalog."*
-- **Expected Action**: The AI calls `add_book(title="Fluent Python", author="Luciano Ramalho")`.
-- **Expected Response**: The AI confirms the book was added with its newly assigned ID.
-
-### Question 3 (Triggers `borrow_book`)
-> *"Can I borrow book ID 1 ('The Hobbit')? Also, what happens if I ask to borrow it again immediately?"*
-- **Expected Action**: The AI calls `borrow_book(book_id=1)`.
-- **Expected Response**: The AI confirms the checkout succeeded. If called a second time, the AI explains the book is already checked out.
-
----
-
-## Running Automated Tests
-
-The project includes an automated test suite using `pytest`. The tests use isolated temporary SQLite databases so your production `library.db` remains untouched.
-
-Run tests using PowerShell:
+Execute the end-to-end verification script to see live JSON-RPC exchanges across all three servers:
 
 ```powershell
-.venv\Scripts\pytest.exe -v
+.\.venv\Scripts\python.exe scripts\verify_mcp_exchanges.py
 ```
 
-### Test Coverage Summary:
-- `test_search_books`: Verifies title search, author search, non-matching terms, and empty inputs.
-- `test_add_valid_book`: Confirms book insertion, ID generation, and persistence.
-- `test_add_invalid_input_and_duplicates`: Ensures blank titles, blank authors, and duplicate entries are rejected.
-- `test_borrow_available_book`: Tests borrowing workflow and status transition from `Available` to `Borrowed`.
-- `test_borrow_unknown_or_already_borrowed`: Verifies error handling for missing IDs and double-borrowing attempts.
-- `test_resource_and_prompt`: Verifies catalog formatting and prompt template generation.
+### Verified Terminal Output:
+```text
+======================================================================
+1. AUDIT: BOOK LIBRARY MCP SERVER (server.py)
+======================================================================
+[Protocol Status] Initialized stdio session successfully.
+[Exchange: tools/list]
+  - Tool: search_books
+  - Tool: add_book
+  - Tool: borrow_book
 
----
+[Exchange: tools/call -> search_books(query='Orwell')]
+  Response: Found 1 book(s) matching 'Orwell':
+- [ID: 2] "1984" by George Orwell | Status: Available
 
-## Project Structure
+[Exchange: tools/call -> add_book(title='Test Book A', author='Jane Doe')]
+  Response: Success: Successfully added book 'Test Book A' by Jane Doe with ID 6.
 
+[Exchange: tools/call -> borrow_book(book_id=2)]
+  Response: Success: Successfully borrowed '1984' by George Orwell (ID: 2). Enjoy reading!
+
+[Exchange: tools/call -> borrow_book(book_id=2) [Repeat Attempt]]
+  Response: Borrow failed: Borrow error: '1984' (ID: 2) is already borrowed and not currently available.
+
+======================================================================
+2. AUDIT: RESTRICTED FILESYSTEM MCP SERVER (filesystem_server.py)
+======================================================================
+[Exchange: tools/call -> read_file(file_path='sample.txt')]
+  Response: Hello from the dedicated MCP filesystem test folder!
+
+[Exchange: tools/call -> read_file(file_path='../../server.py') (Boundary Check)]
+  Response: Error: Access denied: Path resolves outside allowed test folder.
+
+======================================================================
+3. AUDIT: GITHUB MCP SERVER (github_server.py)
+======================================================================
+[Exchange: tools/call -> get_repository(owner='modelcontextprotocol', repo='servers')]
+  Response: Repository: modelcontextprotocol/servers | Stars: 91303 | Forks: 11794
 ```
-mcp-server/
-│
-├── server.py              # Main MCP Server (Tools, Resource, Prompt, Stdio runner)
-├── database.py            # SQLite database manager (Schema, seeding, queries, mutations)
-├── library.db             # Local SQLite database file (created automatically on startup)
-├── requirements.txt       # Project dependencies (mcp[cli], pytest)
-├── .gitignore             # Git ignore rules for venv, cache, and db files
-├── README.md              # Project documentation and internship guide
-│
-└── tests/
-    └── test_server.py     # Automated pytest suite with isolated DB fixtures
-```
 
 ---
 
-## Security & Input Validation
-
-- **SQL Injection Prevention**: Uses parameterized queries (`?`) for all SQLite interactions.
-- **Input Sanitization**: Trims all user inputs and rejects blank or whitespace-only values.
-- **Duplicate Prevention**: Checks existing title and author combinations (case-insensitive) before inserting.
-- **Safe ID Handling**: Validates book IDs as positive integers before querying.
-- **Scoped Operations**: Strictly operates within the application's local SQLite database; no system-level commands or secret exposures.
-- **Persistent Storage**: Changes remain stored across server restarts.
-
----
-
-## Project Limitations
-
-- **Single-Node Storage**: Uses local SQLite suitable for single-host desktop deployments. For multi-user concurrent web hosting, PostgreSQL or MySQL can be substituted.
-- **Stdio Transport**: Intended for local desktop execution spawned as a child process. Remote network access would require HTTP/SSE or Streamable HTTP transport with authentication.
-- **Return Workflow**: Currently implements `borrow_book`. A `return_book` tool can easily be added following the same pattern.
-
----
-
-## Git & GitHub Setup
-
-To initialize your Git repository and push your project to a GitHub repository named `mcp-intern-sasikala`:
+## GitHub Submission Guide
 
 ```powershell
-# 1. Initialize Git in the project root
-git init
+# 1. Check Git status (tracked files clean, secrets and DBs ignored)
+git status
 
-# 2. Stage all files (respecting .gitignore)
+# 2. Stage and commit updates
 git add .
+git commit -m "docs: finalize Day 1 through Day 5 audit, tests, and evidence"
 
-# 3. Create initial commit
-git commit -m "feat: complete Book Library MCP server implementation"
-
-# 4. Set default branch to main
-git branch -M main
-
-# 5. Link your GitHub remote repository (replace YOUR_USERNAME with your GitHub handle)
-git remote add origin https://github.com/YOUR_USERNAME/mcp-intern-sasikala.git
-
-# 6. Push code to GitHub
+# 3. Create the remote repository on GitHub named 'mcp-intern-sasikala'
+# 4. Link origin and push (replace YOUR_GITHUB_USERNAME with your GitHub account)
+git remote add origin https://github.com/YOUR_GITHUB_USERNAME/mcp-intern-sasikala.git
 git push -u origin main
 ```
 
 ---
 
-## Five-Minute Internship Demo Script
+## Five-Minute Internship Presentation Script
 
-Use this structured script to present your project to mentors or colleagues:
-
-| Time | Step | Action & Speaking Points |
+| Time | Agenda | Action & What to Say |
 | :---: | :--- | :--- |
-| **0:00 - 0:45** | **Architecture Explanation** | *"I built a Book Library MCP Server using Python, the official MCP SDK, and SQLite. In MCP architecture, the **Host** is the AI interface, the **Client** translates requests, and our **Server** exposes tools and data over standard I/O."* |
-| **0:45 - 1:45** | **Show Automated Tests** | Run `.venv\Scripts\pytest.exe -v` in PowerShell. Show all 6 tests passing, demonstrating input validation, duplicate prevention, and isolated databases. |
-| **1:45 - 2:45** | **MCP Inspector: Tools** | Launch `.venv\Scripts\mcp.exe dev server.py`. Show `tools/list` displaying `search_books`, `add_book`, and `borrow_book`. Call `search_books("Orwell")` to show live database results. |
-| **2:45 - 3:30** | **Resource & Prompt** | In Inspector, show the `library://catalog` resource returning the full inventory table. Then show the `recommend-a-book` prompt preventing AI hallucinations by grounding recommendations in actual stock. |
-| **3:30 - 4:30** | **Real AI Interaction** | Open Antigravity or Claude Desktop. Ask: *"What programming books are available in the library and can I borrow one?"* Show the AI autonomously selecting `search_books` and `borrow_book`. |
-| **4:30 - 5:00** | **Wrap Up & Q&A** | Summarize the clean modular codebase (`server.py`, `database.py`, `tests/`), safety guarantees, and GitHub repository `mcp-intern-sasikala`. |
+| **0:00 - 0:45** | **Architecture** | *"In MCP architecture, the **Host** is the AI interface, the **Client** handles protocol negotiation, and the **Server** exposes data and tools over standard I/O."* |
+| **0:45 - 1:30** | **Day 1: Existing Servers** | Show the **Restricted Filesystem** server bounded to `test_folder/` and the **GitHub** server using minimum-privilege token access. |
+| **1:30 - 2:30** | **Automated Tests** | Run `.\.venv\Scripts\python.exe -m pytest -v`. Point out that all 6 tests pass against isolated SQLite databases. |
+| **2:30 - 3:30** | **Live Protocol Exchanges** | Run `.\.venv\Scripts\python.exe scripts\verify_mcp_exchanges.py`. Show real `tools/list`, search, book addition, and duplicate borrow rejection. |
+| **3:30 - 4:30** | **AI Host Integration** | Show Antigravity's discovered schemas in `~/.gemini/antigravity/mcp/book-library/` and explain how the AI selects tools autonomously. |
+| **4:30 - 5:00** | **Wrap Up** | Point to the clean Git repository `mcp-intern-sasikala` and conclude the presentation. |
