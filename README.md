@@ -1,13 +1,13 @@
 # MCP Intern Project — Book Library & Existing MCP Servers
 
-A complete, production-grade **Model Context Protocol (MCP)** implementation built in Python using SQLite for the internship assignment: *"MCP Intern Project: Build Your First MCP Server"*.
+A complete **Model Context Protocol (MCP)** implementation built in Python using SQLite for the internship assignment: *"MCP Intern Project: Build Your First MCP Server"*.
 
 This repository contains:
 1. **The Book Library MCP Server** (`server.py`): The core custom project with real-time SQLite storage, duplicate prevention, and grounded prompts.
 2. **Existing MCP Server Integrations (Day 1 Requirements)**:
    - **Filesystem MCP Server** restricted to a dedicated `test_folder/`.
    - **GitHub MCP Server** configured securely with least-privilege token access.
-3. **Automated Verification & Test Suite**: 6 automated pytest tests and an end-to-end stdio protocol exchange runner.
+3. **Automated Verification & Test Suite**: 9 automated pytest tests and an end-to-end stdio protocol exchange runner.
 
 ---
 
@@ -27,7 +27,7 @@ This repository contains:
 7. [Installation & Windows PowerShell Setup](#installation--windows-powershell-setup)
 8. [Testing with MCP Inspector](#testing-with-mcp-inspector)
 9. [Running Real Protocol Exchanges](#running-real-protocol-exchanges)
-10. [GitHub Submission Guide (`mcp-server`)](#github-submission-guide)
+10. [GitHub Submission Guide](#github-submission-guide)
 11. [Five-Minute Internship Presentation Script](#five-minute-internship-presentation-script)
 
 ---
@@ -138,18 +138,17 @@ Run the automated test suite using the virtual environment:
 
 ### Verified Test Results:
 ```text
-============================= test session starts =============================
-platform win32 -- Python 3.10.11, pytest-9.1.1, pluggy-1.7.0
-rootdir: C:\Users\acer\OneDrive\Documents\fastapi\mcp-server
+tests/test_hello_server.py::test_say_hello_with_name PASSED
+tests/test_hello_server.py::test_say_hello_default PASSED
+tests/test_hello_server.py::test_say_hello_empty_or_whitespace PASSED
+tests/test_server.py::test_search_books PASSED
+tests/test_server.py::test_add_valid_book PASSED
+tests/test_server.py::test_add_invalid_input_and_duplicates PASSED
+tests/test_server.py::test_borrow_available_book PASSED
+tests/test_server.py::test_borrow_unknown_or_already_borrowed PASSED
+tests/test_server.py::test_resource_and_prompt PASSED
 
-tests/test_server.py::test_search_books PASSED                           [ 16%]
-tests/test_server.py::test_add_valid_book PASSED                         [ 33%]
-tests/test_server.py::test_add_invalid_input_and_duplicates PASSED       [ 50%]
-tests/test_server.py::test_borrow_available_book PASSED                  [ 66%]
-tests/test_server.py::test_borrow_unknown_or_already_borrowed PASSED     [ 83%]
-tests/test_server.py::test_resource_and_prompt PASSED                    [100%]
-
-============================== 6 passed in 2.47s ==============================
+============================== 9 passed in 3.48s ==============================
 ```
 
 - **Isolation Guarantee**: Uses `pytest` `tmp_path` fixtures to ensure each test runs against a fresh, temporary SQLite database. The production `library.db` is never modified during test runs.
@@ -183,6 +182,12 @@ Antigravity automatically discovers and configures local stdio MCP servers via `
       "command": "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\.venv\\Scripts\\python.exe",
       "args": [
         "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\servers\\github_server.py"
+      ]
+    },
+    "hello-server": {
+      "command": "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\.venv\\Scripts\\python.exe",
+      "args": [
+        "c:\\Users\\acer\\OneDrive\\Documents\\fastapi\\mcp-server\\hello_server.py"
       ]
     }
   }
@@ -239,6 +244,8 @@ Execute the end-to-end verification script to see live JSON-RPC exchanges across
 .\.venv\Scripts\python.exe scripts\verify_mcp_exchanges.py
 ```
 
+> **Note:** Book IDs, titles, and availability statuses in the sample output below reflect the test database state during verification and may vary depending on the database instance used. The sample output demonstrates protocol formatting and error handling rather than a static snapshot of the live database.
+
 ### Verified Terminal Output:
 ```text
 ======================================================================
@@ -284,17 +291,16 @@ Execute the end-to-end verification script to see live JSON-RPC exchanges across
 ## GitHub Submission Guide
 
 ```powershell
-# 1. Check Git status (tracked files clean, secrets and DBs ignored)
+# 1. Inspect existing remote configuration
+git remote -v
+# origin  https://github.com/sasikalascgm-droid/mcp-server.git (fetch)
+# origin  https://github.com/sasikalascgm-droid/mcp-server.git (push)
+
+# 2. Check Git status (verify working tree is clean and .venv/databases/caches are ignored)
 git status
 
-# 2. Stage and commit updates
-git add .
-git commit -m "docs: finalize Day 1 through Day 5 audit, tests, and evidence"
-
-# 3. Create the remote repository on GitHub named 'mcp-server'
-# 4. Link origin and push (replace YOUR_GITHUB_USERNAME with your GitHub account)
-git remote add origin https://github.com/sasikalascgm-droid/mcp-server.git
-git push -u origin main
+# 3. Push code to the configured GitHub repository
+git push origin main
 ```
 
 ---
@@ -305,7 +311,7 @@ git push -u origin main
 | :---: | :--- | :--- |
 | **0:00 - 0:45** | **Architecture** | *"In MCP architecture, the **Host** is the AI interface, the **Client** handles protocol negotiation, and the **Server** exposes data and tools over standard I/O."* |
 | **0:45 - 1:30** | **Day 1: Existing Servers** | Show the **Restricted Filesystem** server bounded to `test_folder/` and the **GitHub** server using minimum-privilege token access. |
-| **1:30 - 2:30** | **Automated Tests** | Run `.\.venv\Scripts\python.exe -m pytest -v`. Point out that all 6 tests pass against isolated SQLite databases. |
+| **1:30 - 2:30** | **Automated Tests** | Run `.\.venv\Scripts\python.exe -m pytest -v`. Point out that all 9 tests pass against isolated SQLite databases. |
 | **2:30 - 3:30** | **Live Protocol Exchanges** | Run `.\.venv\Scripts\python.exe scripts\verify_mcp_exchanges.py`. Show real `tools/list`, search, book addition, and duplicate borrow rejection. |
 | **3:30 - 4:30** | **AI Host Integration** | Show Antigravity's discovered schemas in `~/.gemini/antigravity/mcp/book-library/` and explain how the AI selects tools autonomously. |
 | **4:30 - 5:00** | **Wrap Up** | Point to the clean Git repository `mcp-server` and conclude the presentation. |
