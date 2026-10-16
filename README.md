@@ -27,7 +27,7 @@ This repository contains:
 7. [Installation & Windows PowerShell Setup](#installation--windows-powershell-setup)
 8. [Testing with MCP Inspector](#testing-with-mcp-inspector)
 9. [Running Real Protocol Exchanges](#running-real-protocol-exchanges)
-10. [GitHub Submission Guide (`mcp-intern-sasikala`)](#github-submission-guide)
+10. [GitHub Submission Guide (`mcp-server`)](#github-submission-guide)
 11. [Five-Minute Internship Presentation Script](#five-minute-internship-presentation-script)
 
 ---
@@ -99,7 +99,7 @@ The mentor assignment requires connecting two existing servers:
   - Never display token characters in logs or terminal outputs.
 - **Minimum Required GitHub Permissions**:
   - Prefer a **Fine-Grained Personal Access Token (PAT)** over classic tokens.
-  - **Repository Scope**: Only select the target repository (e.g., `mcp-intern-sasikala`), NOT "All repositories".
+  - **Repository Scope**: Only select the target repository (e.g., `mcp-server`), NOT "All repositories".
   - **Permissions**:
     - `Contents`: Read & Write (for reading files and pushing code).
     - `Issues`: Read & Write (for managing project issues).
@@ -291,9 +291,9 @@ git status
 git add .
 git commit -m "docs: finalize Day 1 through Day 5 audit, tests, and evidence"
 
-# 3. Create the remote repository on GitHub named 'mcp-intern-sasikala'
+# 3. Create the remote repository on GitHub named 'mcp-server'
 # 4. Link origin and push (replace YOUR_GITHUB_USERNAME with your GitHub account)
-git remote add origin https://github.com/YOUR_GITHUB_USERNAME/mcp-intern-sasikala.git
+git remote add origin https://github.com/sasikalascgm-droid/mcp-server.git
 git push -u origin main
 ```
 
@@ -308,4 +308,4 @@ git push -u origin main
 | **1:30 - 2:30** | **Automated Tests** | Run `.\.venv\Scripts\python.exe -m pytest -v`. Point out that all 6 tests pass against isolated SQLite databases. |
 | **2:30 - 3:30** | **Live Protocol Exchanges** | Run `.\.venv\Scripts\python.exe scripts\verify_mcp_exchanges.py`. Show real `tools/list`, search, book addition, and duplicate borrow rejection. |
 | **3:30 - 4:30** | **AI Host Integration** | Show Antigravity's discovered schemas in `~/.gemini/antigravity/mcp/book-library/` and explain how the AI selects tools autonomously. |
-| **4:30 - 5:00** | **Wrap Up** | Point to the clean Git repository `mcp-intern-sasikala` and conclude the presentation. |
+| **4:30 - 5:00** | **Wrap Up** | Point to the clean Git repository `mcp-server` and conclude the presentation. |
