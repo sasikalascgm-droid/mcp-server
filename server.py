@@ -1,13 +1,6 @@
-"""Book Library MCP Server.
 
-Provides tools, resources, and prompts for AI applications to interact with
-a persistent local SQLite book library using the Model Context Protocol (MCP).
-"""
+"""Book Library MCP Server with confirmation checks for write operations."""
 
-import os
-import sys
-
-# Support both MCP SDK 1.x (FastMCP) and 2.x (MCPServer)
 try:
     from mcp.server.fastmcp import FastMCP
 except (ImportError, ModuleNotFoundError):
@@ -15,102 +8,109 @@ except (ImportError, ModuleNotFoundError):
 
 import database
 
-# Initialize the MCP Server instance
 mcp = FastMCP("Book Library")
-
-# Ensure database is initialized when server module is loaded
 database.init_db()
 
 
-# ---------------------------------------------------------------------------
-# Tool 1: search_books
-# ---------------------------------------------------------------------------
 @mcp.tool(
     name="search_books",
-    description="Search books by title or author keywords. Returns matching books with ID, title, author, and availability status.",
+    description=(
+        "Read-only tool. Search books by title or author keywords. "
+        "This tool does not modify the library."
+    ),
 )
 def search_books(query: str) -> str:
-    """Searches the library catalogue for books matching the given query string.
-
-    Args:
-        query: Search term to match against book titles or authors.
-
-    Returns:
-        A human-readable list of matching books or a helpful status message.
-    """
+    """Search books without modifying the database."""
     clean_query = (query or "").strip()
+
     if not clean_query:
-        return "Search input is empty. Please provide a search term (e.g., author name like 'Orwell' or title keyword like 'Code')."
+        return "Search input is empty. Please provide a title or author."
 
     results = database.search_books(clean_query)
-    if not results:
-        return f"No books found matching '{clean_query}'. Use the 'library://catalog' resource or try searching with another keyword."
 
-    lines = [f"Found {len(results)} book(s) matching '{clean_query}':"]
+    if not results:
+        return f"No books found matching '{clean_query}'."
+
+    lines = [f"Found {len(results)} book(s):"]
+
     for book in results:
         lines.append(
-            f"- [ID: {book['id']}] \"{book['title']}\" by {book['author']} | Status: {book['status']}"
+            f"- [ID: {book['id']}] \"{book['title']}\" by "
+            f"{book['author']} | Status: {book['status']}"
         )
+
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# Tool 2: add_book
-# ---------------------------------------------------------------------------
 @mcp.tool(
     name="add_book",
-    description="Add a new book to the library catalog with a title and author. Validates input and prevents duplicate entries.",
+    description=(
+        "Write operation: add one book using its title and author. "
+        "Requires confirmation='ADD BOOK'. The client should ask the "
+        "user for approval before making the confirmed tool call."
+    ),
 )
-def add_book(title: str, author: str) -> str:
-    """Adds a new book record into the SQLite database.
+def add_book(
+    title: str,
+    author: str,
+    confirmation: str = "",
+) -> str:
+    """Add a book only when the required confirmation is supplied."""
+    if confirmation != "ADD BOOK":
+        return (
+            "Confirmation required. Ask the user to approve adding "
+            "this book before retrying with confirmation='ADD BOOK'. "
+            "No changes were made."
+        )
 
-    Args:
-        title: The full title of the book.
-        author: The author or authors of the book.
+    success, message, book = database.add_book(
+        title=title,
+        author=author,
+    )
 
-    Returns:
-        A confirmation message with the new book ID, or an explanatory error message.
-    """
-    success, message, book = database.add_book(title=title, author=author)
     if not success:
         return f"Failed to add book: {message}"
 
     return (
         f"Success: {message}\n"
-        f"Details: [ID: {book['id']}] \"{book['title']}\" by {book['author']} (Status: Available)"
+        f"Details: [ID: {book['id']}] \"{book['title']}\" by "
+        f"{book['author']} (Status: Available)"
     )
 
 
-# ---------------------------------------------------------------------------
-# Tool 3: borrow_book
-# ---------------------------------------------------------------------------
 @mcp.tool(
     name="borrow_book",
-    description="Borrow an available book from the library using its numeric book ID. Returns an error if not found or already borrowed.",
+    description=(
+        "Write operation: borrow one available book using its numeric ID. "
+        "Requires confirmation='BORROW BOOK'. The client should ask the "
+        "user for approval before making the confirmed tool call."
+    ),
 )
-def borrow_book(book_id: int) -> str:
-    """Marks a book as borrowed in the library database.
+def borrow_book(
+    book_id: int,
+    confirmation: str = "",
+) -> str:
+    """Borrow a book only when the required confirmation is supplied."""
+    if confirmation != "BORROW BOOK":
+        return (
+            "Confirmation required. Ask the user to approve borrowing "
+            "this book before retrying with confirmation='BORROW BOOK'. "
+            "No changes were made."
+        )
 
-    Args:
-        book_id: The unique integer ID of the book to borrow.
-
-    Returns:
-        A success confirmation or a specific reason why the borrow operation could not be completed.
-    """
     success, message, book = database.borrow_book(book_id=book_id)
+
     if not success:
         return f"Borrow failed: {message}"
 
     return f"Success: {message}"
 
 
-# ---------------------------------------------------------------------------
-# Resource: library://catalog
-# ---------------------------------------------------------------------------
 @mcp.resource("library://catalog")
 def get_catalog() -> str:
-    """Returns the complete library book catalog, including book IDs, titles, authors, and availability status."""
+    """Return a read-only view of the library catalog."""
     books = database.get_all_books()
+
     if not books:
         return "The library catalog is currently empty."
 
@@ -119,65 +119,58 @@ def get_catalog() -> str:
         f"{'ID':<6} {'Status':<12} {'Title':<35} {'Author'}",
         "-" * 75,
     ]
-    for b in books:
-        lines.append(f"{b['id']:<6} {b['status']:<12} {b['title']:<35} {b['author']}")
+
+    for book in books:
+        lines.append(
+            f"{book['id']:<6} {book['status']:<12} "
+            f"{book['title']:<35} {book['author']}"
+        )
 
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# Prompt: recommend-a-book
-# ---------------------------------------------------------------------------
 @mcp.prompt("recommend-a-book")
-def recommend_book(topic_or_genre: str = "general reading") -> str:
-    """Provides a prompt template guiding the AI to recommend books strictly from the verified library catalog."""
+def recommend_book(
+    topic_or_genre: str = "general reading",
+) -> str:
+    """Generate a recommendation prompt from the real catalog."""
     books = database.get_all_books()
-    available_books = [b for b in books if not b["is_borrowed"]]
-    borrowed_books = [b for b in books if b["is_borrowed"]]
 
-    available_summary = (
-        "\n".join(
-            [
-                f"- [ID: {b['id']}] '{b['title']}' by {b['author']}"
-                for b in available_books
-            ]
-        )
-        or "None currently available."
-    )
+    available_books = [
+        book for book in books if not book["is_borrowed"]
+    ]
+    borrowed_books = [
+        book for book in books if book["is_borrowed"]
+    ]
 
-    borrowed_summary = (
-        "\n".join(
-            [
-                f"- [ID: {b['id']}] '{b['title']}' by {b['author']} (Currently Borrowed)"
-                for b in borrowed_books
-            ]
-        )
-        or "None."
-    )
+    available_summary = "\n".join(
+        f"- [ID: {book['id']}] '{book['title']}' by {book['author']}"
+        for book in available_books
+    ) or "None currently available."
 
-    prompt_text = f"""You are a helpful and knowledgeable library assistant.
-A reader is seeking a book recommendation based on the following topic or interest:
-"{topic_or_genre}"
+    borrowed_summary = "\n".join(
+        f"- [ID: {book['id']}] '{book['title']}' by {book['author']} "
+        "(Currently Borrowed)"
+        for book in borrowed_books
+    ) or "None."
 
-Here is the current, real catalog from our library database:
+    return f"""You are a helpful library assistant.
 
-AVAILABLE FOR IMMEDIATE BORROWING:
+Reader interest: "{topic_or_genre}"
+
+AVAILABLE BOOKS:
 {available_summary}
 
-CURRENTLY BORROWED (Collection reference only):
+CURRENTLY BORROWED:
 {borrowed_summary}
 
 CRITICAL RULES:
-1. ONLY recommend books that are explicitly listed in the catalog above. Do NOT hallucinate or suggest books not in this list.
-2. Recommend the best matching available book first, mentioning its ID so the user can easily borrow it with the 'borrow_book' tool.
-3. If an interested book is currently borrowed, politely inform the user that it exists in the library but is currently checked out.
-4. Explain clearly and concisely why the recommended book fits their stated interest: "{topic_or_genre}".
+1. Recommend only books listed in this catalog.
+2. Include the book ID and explain why it matches the reader's interest.
+3. Clearly identify books that are currently borrowed.
+4. Never invent books or claim that an unavailable book is available.
 """
-    return prompt_text
 
 
 if __name__ == "__main__":
-    # Ensure database is initialized before serving requests
-    database.init_db()
-    # Run the server over stdio transport
     mcp.run(transport="stdio")
